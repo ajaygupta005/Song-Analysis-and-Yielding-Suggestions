@@ -1,0 +1,21 @@
+# Core Python libraries
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+pyarrow
+
+# Spark
+pyspark==3.5.1
+
+# Application UI
+streamlit
+
+# Airflow (keeping for completeness, but not used in the core pipeline)
+apache-airflow==2.8.1
+apache-airflow-providers-apache-spark
+apache-airflow-providers-http
+
+# Utilities
+requests

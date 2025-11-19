@@ -1,0 +1,12 @@
+services:
+  spotify:
+    build: .
+    container_name: spotify_app
+    ports:
+      - "8501:8501"
+    # Mounts the current directory into /app for persistence and code access
+    volumes:
+      - .:/app
+    # Ensure Spark can run with enough resources (optional but recommended for PySpark)
+    environment:
+      - SPARK_OPTS=-Dspark.driver.maxResultSize=4g
