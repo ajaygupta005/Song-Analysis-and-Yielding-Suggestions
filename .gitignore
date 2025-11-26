@@ -33,7 +33,7 @@ venv.bak/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
+notebooks/
 
 # PyCharm
 .idea/
@@ -41,12 +41,14 @@ venv.bak/
 # VS Code
 .vscode/
 
-# Airflow
-airflow/logs/
-airflow_home/logs/
-airflow.db
-airflow-webserver.pid
-standalone_admin_password.txt
+# Deprecated/Unused (Should be deleted)
+airflow/
+airflow_home/
+dags/
+artifacts/
+check_spark_env.py
+run_pipeline.py
+DOCKER_SETUP.md
 
 # Spark
 metastore_db/
@@ -57,12 +59,20 @@ spark-warehouse/
 data/raw/*.csv
 data/processed/*.csv
 data/processed/*.parquet
+data/processed/**/*.parquet
 data/output/*.csv
-data/
+
+# Keep directory structure but ignore contents
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/output/*
+!data/output/.gitkeep
 
 # Model files
-models/
-artifacts/
+models/*
+!models/.gitkeep
 
 # OS
 .DS_Store
@@ -77,6 +87,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Prefect
+.prefect/
 
 # Environment variables
 .env

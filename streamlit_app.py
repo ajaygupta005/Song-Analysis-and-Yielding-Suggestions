@@ -1,51 +1,98 @@
 import streamlit as st
 import pandas as pd
 import os
-from src.pipeline.main_pipeline import run_pipeline, MODEL_PATH, RAW_PATH # Correct path
+from pathlib import Path
+from src.pipeline.prefect_pipeline import run_pipeline
 from src.model.recommender import recommend
-# We remove the global call to get_spark() here.
+from src.config.config import MODEL_PATH, PROCESSED_DATA_PATH
 
-# --- UI Layout ---
-st.set_page_config(page_title="Spotify Recommender Demo")
+st.set_page_config(
+    page_title="Music Recommendation System",
+    page_icon="🎵",
+    layout="wide"
+)
 
-st.title("🎧 Spotify ALS Recommender System")
-st.markdown("Click the button to run the PySpark data pipeline and train the ALS model.")
+st.title("🎵 Spotify Music Recommendation Engine")
+st.markdown("""
+Real user data processing with **Apache Spark** and **Prefect orchestration** 
+for personalized music recommendations using collaborative filtering.
+""")
 
-# --- Pipeline Execution ---
-st.header("1. Data Pipeline & Model Training")
+col1, col2 = st.columns([2, 1])
 
-if st.button("Run Full Pipeline (Generate Data & Train Model)"):
-    # This is where the Spark initialization delay will now happen (on user click)
-    with st.spinner('Starting PySpark and running pipeline... This may take a moment.'):
-        run_pipeline(force_run=True)
-    st.success(f"Pipeline complete! Model saved to `{MODEL_PATH}`.")
-
-# --- Recommendation Generation ---
-st.header("2. Get Recommendations")
-
-if os.path.exists(MODEL_PATH):
-    # Find available users from the generated data (assuming 500 users)
-    available_users = [str(i) for i in range(1, 501)]
+with col1:
+    st.header("Pipeline Execution")
+    st.markdown("Run the complete ETL pipeline with real user-song data:")
     
-    user_id_str = st.selectbox(
-        "Select a User ID for recommendation:",
-        options=available_users
-    )
+    if st.button("🚀 Execute Data Pipeline", type="primary"):
+        with st.spinner("Running distributed data pipeline..."):
+            try:
+                run_pipeline(force_run=True)
+                st.success("✅ Pipeline executed successfully!")
+                st.info(f"Model artifacts saved to: `{MODEL_PATH}`")
+            except Exception as e:
+                st.error(f"Pipeline failed: {str(e)}")
+
+with col2:
+    st.header("Pipeline Stages")
+    st.markdown("""
+    **Orchestration**: Prefect workflow engine
     
-    k = st.slider("Number of Recommendations (k):", 1, 20, 5)
+    1. **Data Loading**: Load real user-song interactions
+    2. **Transformation**: Spark-based feature engineering
+    3. **Model Training**: ALS collaborative filtering
     
-    if st.button("Generate Recommendations"):
-        user_id = int(user_id_str)
+    Each task includes retry logic and logging.
+    """)
+
+st.divider()
+
+st.header("Recommendation Service")
+
+model_exists = os.path.exists(MODEL_PATH)
+
+if model_exists:
+    from src.config.config import RAW_DATA_PATH
+    interactions_file = Path(RAW_DATA_PATH) / "user_track_interactions.csv"
+    
+    if interactions_file.exists():
+        interactions_df = pd.read_csv(interactions_file)
+        unique_users = sorted(interactions_df['user_id'].unique())
         
-        with st.spinner(f"Generating top {k} recommendations for User {user_id}..."):
-            # The recommender function will now call get_spark() internally.
-            recommendations_df = recommend(MODEL_PATH, user_id, k)
-
-            if recommendations_df is not None:
-                st.subheader(f"Top {k} Tracks for User {user_id}")
-                st.dataframe(recommendations_df)
-            else:
-                st.error("Could not generate recommendations. Check pipeline logs for errors.")
-
+        col3, col4 = st.columns([1, 3])
+        
+        with col3:
+            user_id = st.selectbox(
+                "Select User ID:",
+                options=unique_users,
+                index=0
+            )
+            
+            k = st.slider("Top-K Recommendations:", 1, 20, 5)
+            
+            generate_btn = st.button("Generate Recommendations", type="primary")
+        
+        with col4:
+            if generate_btn:
+                with st.spinner(f"Generating recommendations for User {user_id}..."):
+                    try:
+                        recommendations = recommend(str(MODEL_PATH), user_id, k)
+                        
+                        if not recommendations.empty:
+                            st.subheader(f"Top {k} Recommendations for User {user_id}")
+                            
+                            recommendations.index = range(1, len(recommendations) + 1)
+                            st.dataframe(
+                                recommendations,
+                                use_container_width=True,
+                                hide_index=False
+                            )
+                        else:
+                            st.warning("No recommendations available for this user.")
+                            
+                    except Exception as e:
+                        st.error(f"Recommendation failed: {str(e)}")
+    else:
+        st.warning("Interaction data not found. Please run the pipeline first.")
 else:
-    st.warning("Model not found. Please click 'Run Full Pipeline' above to train the model first.")
+    st.warning("⚠️ Model not found. Execute the pipeline first to train the model.")

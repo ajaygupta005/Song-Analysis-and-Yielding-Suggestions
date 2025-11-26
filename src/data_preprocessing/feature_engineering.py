@@ -1,50 +1,65 @@
-from pyspark.sql.functions import col, monotonically_increasing_id
+import logging
+from pyspark.sql.functions import col, count, avg, min as spark_min, max as spark_max
+from pyspark.sql.types import StructType, StructField, IntegerType, FloatType
 from src.utils.spark_session import get_spark
+
+logger = logging.getLogger(__name__)
+
+class FeatureEngineer:
+    def __init__(self, spark_session):
+        self.spark = spark_session
+        
+    def load_interactions(self, processed_path):
+        schema = StructType([
+            StructField("user_id", IntegerType(), True),
+            StructField("track_id", IntegerType(), True),
+            StructField("rating", FloatType(), True)
+        ])
+        
+        interactions = self.spark.read.csv(
+            f"{processed_path}/user_track_interactions.csv", 
+            header=True, 
+            schema=schema
+        )
+        
+        logger.info(f"Loaded {interactions.count()} interactions")
+        return interactions
+        
+    def transform_data(self, interactions_df):
+        training_df = interactions_df.select(
+            col("user_id").cast("integer"),
+            col("track_id").cast("integer"),
+            col("rating").cast("float")
+        )
+        
+        training_df = training_df.dropna()
+        
+        return training_df
+        
+    def validate_and_log_stats(self, df):
+        stats = df.agg(
+            count("*").alias("total_interactions"),
+            avg("rating").alias("avg_rating"),
+            spark_min("rating").alias("min_rating"),
+            spark_max("rating").alias("max_rating")
+        ).collect()[0]
+        
+        logger.info(f"Training set statistics:")
+        logger.info(f"  Total interactions: {stats['total_interactions']}")
+        logger.info(f"  Unique users: {df.select('user_id').distinct().count()}")
+        logger.info(f"  Unique tracks: {df.select('track_id').distinct().count()}")
+        logger.info(f"  Rating range: [{stats['min_rating']:.2f}, {stats['max_rating']:.2f}]")
+        logger.info(f"  Average rating: {stats['avg_rating']:.2f}")
+        
+    def save_processed_data(self, df, output_path):
+        df.write.mode("overwrite").parquet(f"{output_path}/training_data")
+        logger.info(f"Saved training data to {output_path}/training_data")
 
 def run_feature_engineering(raw_path, processed_path):
     spark = get_spark()
+    engineer = FeatureEngineer(spark)
     
-    # --- 1. Process Real Track Data (data.csv) ---
-    tracks_raw = spark.read.csv(f"{raw_path}/data.csv", header=True, inferSchema=True)
-
-    # Assign a unique, sequential track_id. 
-    # This ID will be used for the relational join with interactions.
-    # Note: We cast to Integer type, which is safer for ALS.
-    tracks_df = tracks_raw.withColumn("track_id", 
-                                      monotonically_increasing_id().cast("integer"))
-    
-    print(f"Real track data processed. Total unique tracks: {tracks_df.count()}")
-
-    # --- 2. Load Synthetic Data ---
-    users = spark.read.csv(f"{raw_path}/users.csv", header=True, inferSchema=True)
-    # The interactions table holds the synthetic user-track-rating data.
-    interactions_raw = spark.read.csv(f"{raw_path}/user_track_interactions.csv", header=True, inferSchema=True)
-
-    # --- 3. Join and Prepare ALS Training Data ---
-    
-    # The key is to map the synthetic interactions (which reference generic IDs) 
-    # to the newly created unique IDs from the real track data.
-    # We will join on the 'track_id' column, assuming the synthetic IDs fall within the range of real track IDs.
-    
-    # Select only user_id and rating from the synthetic interactions
-    interactions_prepped = interactions_raw.select(col("user_id"), col("track_id").alias("synthetic_track_id"), col("rating"))
-    
-    # Join interactions with the real track data to ensure we only keep interactions 
-    # that map to a song in the real data. We join on the synthetic ID.
-    df_joined = interactions_prepped.join(
-        tracks_df.select(col("track_id").alias("final_track_id"), col("track_id").alias("synthetic_track_id_map")), 
-        col("synthetic_track_id") == col("synthetic_track_id_map"), 
-        "inner"
-    )
-
-    # Final DF for ALS training (User ID, Final Track ID, Rating)
-    df_training = df_joined.select(
-        col("user_id").cast("integer"),
-        col("final_track_id").alias("track_id").cast("integer"),
-        col("rating").cast("float")
-    )
-    
-    # Save the final dataset ready for ALS training
-    df_training.write.mode("overwrite").parquet(f"{processed_path}/training_data")
-
-    print(f"Feature engineering completed. Training interactions: {df_training.count()}.")
+    interactions_df = engineer.load_interactions(raw_path)
+    training_df = engineer.transform_data(interactions_df)
+    engineer.validate_and_log_stats(training_df)
+    engineer.save_processed_data(training_df, processed_path)

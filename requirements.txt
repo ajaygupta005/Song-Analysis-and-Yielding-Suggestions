@@ -1,21 +1,28 @@
-# Core Python libraries
+# Data Processing
 pandas
 numpy
-scikit-learn
-matplotlib
-seaborn
 pyarrow
+fastparquet
 
-# Spark
+# Distributed Processing
 pyspark==3.5.1
+
+# Workflow Orchestration
+prefect==2.14.0
+griffe==0.38.0
+
+# ML & Analytics
+scikit-learn
+
+# Data Validation
+pydantic
 
 # Application UI
 streamlit
 
-# Airflow (keeping for completeness, but not used in the core pipeline)
-apache-airflow==2.8.1
-apache-airflow-providers-apache-spark
-apache-airflow-providers-http
-
 # Utilities
 requests
+python-dotenv
+
+# Data Quality & Logging
+loguru
