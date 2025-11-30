@@ -7,15 +7,16 @@ from src.model.recommender import recommend
 from src.config.config import MODEL_PATH, PROCESSED_DATA_PATH
 
 st.set_page_config(
-    page_title="Music Recommendation System",
+    page_title="Song-Analysis-and-Yielding-Suggestions",
     page_icon="🎵",
     layout="wide"
 )
 
 st.title("🎵 Spotify Music Recommendation Engine")
+st.title("🎵 Song-Analysis-and-Yielding-Suggestions")
 st.markdown("""
-Real user data processing with **Apache Spark** and **Prefect orchestration** 
-for personalized music recommendations using collaborative filtering.
+Real user interaction data processed with **Apache Spark** and orchestrated by **Prefect** 
+to train an ALS collaborative filtering model for music recommendation.
 """)
 
 col1, col2 = st.columns([2, 1])
