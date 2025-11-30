@@ -76,4 +76,17 @@ def train_als(processed_path, model_path):
     model, metrics = trainer.train_and_evaluate(train_df, test_df)
     trainer.save_model(model, model_path)
     
+    # Persist metrics for UI and reporting
+    try:
+        import json
+        from pathlib import Path
+        from src.config.config import OUTPUT_PATH
+        Path(OUTPUT_PATH).mkdir(parents=True, exist_ok=True)
+        metrics_file = Path(OUTPUT_PATH) / "training_metrics.json"
+        with open(metrics_file, "w", encoding="utf-8") as f:
+            json.dump(metrics, f, indent=2)
+        logger.info(f"Saved training metrics to {metrics_file}")
+    except Exception as e:
+        logger.warning(f"Failed to persist training metrics: {e}")
+    
     return metrics
